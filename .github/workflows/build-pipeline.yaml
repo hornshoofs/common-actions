@@ -1,0 +1,103 @@
+name: Common build workflow
+
+on:
+  workflow_call:
+    inputs:
+      rep_count_dev:
+        required: false
+        description: set value for replica count deployment property for dev
+        type: string
+      rep_size_dev:
+        required: false
+        description: set value for replica size deployment property for dev
+        type: string
+      rep_count_sit:
+        required: false
+        description: set value for replica count deployment property for sit
+        type: string
+      rep_size_sit:
+        required: false
+        description: set value for replica size deployment property for sit
+        type: string
+
+env:
+  CA_CLIENTID: ${{ secrets.MULE_CA_CLIENTID_NONPROD }}
+  CA_CLIENTSECRET: ${{ secrets.MULE_CA_CLIENTSECRET_NONPROD }}
+
+jobs:
+  build: 
+    runs-on: ubuntu-latest
+
+    steps:
+    #checkout the source code from the git repo
+    - uses: actions/checkout@v4
+
+    #caches maven dependencies
+    - uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+
+    #setup java 17
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    #create settings.xml file with the connected app credentials
+    - uses: s4u/maven-settings-action@v3.0.0
+      name: Create settings.xml
+      with:
+        servers: >
+          [
+            {
+              "id": "AP-Repository",
+              "username": "~~~Client~~~",
+              "password": "${{ env.CA_CLIENTID }}~?~${{ env.CA_CLIENTSECRET }}"
+
+            },
+            {
+              "id": "anypoint-exchange-v3",
+              "username": "~~~Client~~~",
+              "password": "${{ env.CA_CLIENTID }}~?~${{ env.CA_CLIENTSECRET }}"
+
+            }
+          ]
+
+    #download the maven version 3.9.6
+    - name: Set up Maven
+      uses: stCarolas/setup-maven@v5
+      with:
+        maven-version: 3.9.6
+
+    #build a jar file and publish it to Exchange
+    - name: Publish to Exchange
+      run: |
+        mvn deploy -DskipTests
+  
+  #call deployment script with the dev parameters
+  deploy-dev:
+    needs: [build]
+    if: ${{ github.ref == 'refs/heads/main' }}
+    uses: ./.github/workflows/deploy-stage-ch20.yaml
+    with:
+      mule_env: dev
+      var_suffix: DEV
+      in_rep_count: ${{ inputs.rep_count_dev }} 
+      in_rep_size: ${{ inputs.rep_size_dev }}
+    secrets: inherit
+  
+  #call deployment script with the sit parameters
+  deploy-sit:
+    needs: [build]
+    if: ${{ startsWith(github.ref, 'refs/tags/') }}
+    uses: ./.github/workflows/deploy-stage-ch20.yaml
+    with:
+      mule_env: sit
+      var_suffix: SIT
+      in_rep_count: ${{ inputs.rep_count_sit }} 
+      in_rep_size: ${{ inputs.rep_size_sit }}
+    secrets: inherit

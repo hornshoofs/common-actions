@@ -1,0 +1,107 @@
+name: Workflow to prepare a new release
+
+on:
+  workflow_call:
+
+jobs:
+  build: 
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Generate git app token
+      id: generate-token
+      uses: actions/create-github-app-token@v1
+      with:
+        app-id: ${{ secrets.MULE_CI_APP_ID }}
+        private-key: ${{ secrets.MULE_CI_APP_PRIVATE_KEY }}
+    
+    #checkout the source code from the git repo
+    - uses: actions/checkout@v4
+      with:
+        token: ${{ steps.generate-token.outputs.token }}
+
+    #caches maven dependencies
+    - uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+
+    #setup java 17
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    #Configure Git User
+    - name: Configure Git User
+      run: |
+       git config user.name "common-actions"
+       git config user.email "actions@github.com"
+
+    #extract asset version from pom.xml
+    - name: Extract asset version
+      run: |
+        version=`mvn help:evaluate -Dexpression=project.version -q -DforceStdout`
+        echo "assetVersion=$version" >> "$GITHUB_ENV"
+        echo "version = $version"
+
+    #[feature] Prepare release: 1. create tag with release version. 2. increase snapshot version
+    - name: Prepare Release
+      if: ${{ contains(env.assetVersion, 'SNAPSHOT') }}
+      run: |
+        mvn release:prepare -Darguments="-Dmaven.test.skip=true -DskipTests" -DprojectVersionPolicyId=SemVerVersionPolicy -DtagNameFormat='@{project.version}' -DpushChanges=false
+        git push --follow-tags
+
+    #[hotfix] create settings.xml file with the connected app credentials
+    - uses: s4u/maven-settings-action@v3.0.0
+      name: Create settings.xml
+      if: ${{ !contains(env.assetVersion, 'SNAPSHOT') }}
+      with:
+        servers: >
+          [
+            {
+              "id": "anypoint-exchange-v3",
+              "username": "~~~Client~~~",
+              "password": "${{ secrets.MULE_CA_CLIENTID_NONPROD }}~?~${{ secrets.MULE_CA_CLIENTSECRET_NONPROD }}"
+
+            },
+            {
+              "id": "MuleRepository",
+              "username": "${{ secrets.MULE_NEXUS_USERNAME }}",
+              "password": "${{ secrets.MULE_NEXUS_PASSWORD }}"
+            }
+          ]
+        repositories: |
+          [
+            {
+              "id": "MuleRepository",
+              "name": "Mule Repository",
+              "url": "https://repository.mulesoft.org/nexus-ee/content/repositories/releases-ee/",
+              "releases": {
+                "enabled": "true"
+              },
+              "snapshots": {
+                "enabled": "false"
+              }
+            }
+          ]
+
+    #[hotfix] execute MUnit tests
+    - name: MUnit Test
+      if: ${{ !contains(env.assetVersion, 'SNAPSHOT') }}
+      run: |
+        mvn clean test -Dmule.env=dev -Dmule.encryption.key=${{ secrets.MULE_ENCRYPTION_KEY_DEV }} -Dmunit.failBuild=${{ vars.MULE_MUNIT_FAIL }} -Dmunit.appCoverage=${{ vars.MULE_MUNIT_APP_COVERAGE }}
+
+    #[hotfix] increase patch version and create a tag
+    - name: Increase patch version and create tag
+      if: ${{ !contains(env.assetVersion, 'SNAPSHOT') }}
+      run: |
+        mvn build-helper:parse-version versions:set -DnewVersion='${parsedVersion.majorVersion}.${parsedVersion.minorVersion}.${parsedVersion.nextIncrementalVersion}'
+        newVersion=`mvn help:evaluate -Dexpression=project.version -q -DforceStdout`
+        echo "new version = $newVersion"
+        git commit -a -m "prepare release $newVersion"
+        git tag -a $newVersion -m "hotfix release"
+        git push --follow-tags

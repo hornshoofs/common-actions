@@ -1,0 +1,24 @@
+name: Release workflow
+
+on:
+  workflow_call:
+    inputs:
+      rep_count_prod:
+        required: false
+        description: set value for replica count deployment property for prod
+        type: string
+      rep_size_prod:
+        required: false
+        description: set value for replica size deployment property for prod
+        type: string
+
+jobs:
+  #call deployment script with the prod parameters
+  deploy-prod:
+    uses: ./.github/workflows/deploy-stage-ch20.yaml
+    with:
+      mule_env: prod
+      var_suffix: PROD
+      in_rep_count: ${{ inputs.rep_count_prod }} 
+      in_rep_size: ${{ inputs.rep_size_prod }}
+    secrets: inherit

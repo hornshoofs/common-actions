@@ -1,0 +1,73 @@
+name: Workflow to run on pull requests from feature to main branch
+
+on:
+  workflow_call:
+
+env:
+  MULE_ENV: dev
+  TEST_REPORT: false
+
+jobs:
+  merge-feature2main:
+    runs-on: ubuntu-latest
+
+    steps:
+    #checkout the source code from the git repo
+    - uses: actions/checkout@v4
+
+    #caches maven dependencies
+    - uses: actions/cache@v4
+      with:
+        path: ~/.m2/repository
+        key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+        restore-keys: |
+          ${{ runner.os }}-maven-
+
+    #setup java 17
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'zulu'
+        java-version: '17'
+
+    #add repository and credentials to settings.xml
+    - uses: s4u/maven-settings-action@v3.0.0
+      name: Create settings.xml
+      with:
+        servers: |
+          [{
+            "id": "anypoint-exchange-v3",
+            "username": "~~~Client~~~",
+            "password": "${{ secrets.MULE_CA_CLIENTID_NONPROD }}~?~${{ secrets.MULE_CA_CLIENTSECRET_NONPROD }}"
+          },
+          {
+            "id": "MuleRepository",
+            "username": "${{ secrets.MULE_NEXUS_USERNAME }}",
+            "password": "${{ secrets.MULE_NEXUS_PASSWORD }}"
+          }]
+        repositories: |
+          [
+            {
+              "id": "MuleRepository",
+              "name": "Mule Repository",
+              "url": "https://repository.mulesoft.org/nexus-ee/content/repositories/releases-ee/",
+              "releases": {
+                "enabled": "true"
+              },
+              "snapshots": {
+                "enabled": "false"
+              }
+            }
+          ]
+
+    #execute MUnit tests
+    - name: MUnit Test
+      run: |
+        mvn clean test -Dmule.env=${{ env.MULE_ENV }} -Dmule.encryption.key=${{ secrets.MULE_ENCRYPTION_KEY_DEV }} -Dmunit.failBuild=${{ vars.MULE_MUNIT_FAIL }} -Dmunit.appCoverage=${{ vars.MULE_MUNIT_APP_COVERAGE }}
+    
+    #upload coverage report
+    - uses: actions/upload-artifact@v3
+      if: ${{ env.TEST_REPORT == 'true' }}
+      with:
+        name: MUnit-Coverage-Report
+        path: target/site/munit/coverage/
