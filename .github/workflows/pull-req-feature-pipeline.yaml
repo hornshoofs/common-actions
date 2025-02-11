@@ -66,7 +66,7 @@ jobs:
         mvn clean test -Dmule.env=${{ env.MULE_ENV }} -Dmule.encryption.key=${{ secrets.MULE_ENCRYPTION_KEY_DEV }} -Dmunit.failBuild=${{ vars.MULE_MUNIT_FAIL }} -Dmunit.appCoverage=${{ vars.MULE_MUNIT_APP_COVERAGE }}
     
     #upload coverage report
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       if: ${{ env.TEST_REPORT == 'true' }}
       with:
         name: MUnit-Coverage-Report
