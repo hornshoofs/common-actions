@@ -93,7 +93,7 @@ jobs:
     - name: MUnit Test
       if: ${{ !contains(env.assetVersion, 'SNAPSHOT') }}
       run: |
-        mvn clean test -Dmule.env=dev -Dmule.encryption.key=${{ secrets.MULE_ENCRYPTION_KEY_DEV }} -Dmunit.failBuild=${{ vars.MULE_MUNIT_FAIL }} -Dmunit.appCoverage=${{ vars.MULE_MUNIT_APP_COVERAGE }}
+        mvn clean test -Dmule.env=dev -Dencryption.key=${{ secrets.MULE_ENCRYPTION_KEY_DEV }} -Dmunit.failBuild=${{ vars.MULE_MUNIT_FAIL }} -Dmunit.appCoverage=${{ vars.MULE_MUNIT_APP_COVERAGE }}
 
     #[hotfix] increase patch version and create a tag
     - name: Increase patch version and create tag

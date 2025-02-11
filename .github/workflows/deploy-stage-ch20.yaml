@@ -105,7 +105,6 @@ jobs:
           -Dch2.defaultUrl=${{ env.DEFAULT_URL }} \
           -Dch2.releaseChannel=${{ env.RELEASE_CHANNEL }} \
           -Dch2.javaV=${{ env.JAVA_VERSION }} \
-          -Dmule.encryption.key=${{ secrets[format('MULE_ENCRYPTION_KEY_{0}', inputs.var_suffix)] }} \
-          -Dmule.datadogKey=${{ secrets.MULE_API_KEY_DATADOG }} \
+          -Dencryption.key=${{ secrets[format('MULE_ENCRYPTION_KEY_{0}', inputs.var_suffix)] }} \
           -Danypoint.client_id=${{ secrets[format('MULE_AP_CLIENTID_{0}', inputs.var_suffix)] }} \
           -Danypoint.client_secret=${{ secrets[format('MULE_AP_CLIENTSECRET_{0}', inputs.var_suffix)] }} 
