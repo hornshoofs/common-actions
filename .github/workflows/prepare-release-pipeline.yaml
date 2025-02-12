@@ -10,11 +10,10 @@ jobs:
     steps:
     - name: Generate git app token
       id: generate-token
-      uses: actions/create-github-app-token@v1
+      uses: getsentry/action-github-app-token@v3.1
       with:
-        app-id: ${{ secrets.MULE_CI_APP_ID }}
-        private-key: ${{ secrets.MULE_CI_APP_PRIVATE_KEY }}
-        owner: ${{ github.repository_owner }}
+        app_id: ${{ secrets.MULE_CI_APP_ID }}
+        private_key: ${{ secrets.MULE_CI_APP_PRIVATE_KEY }}
     
     #checkout the source code from the git repo
     - uses: actions/checkout@v4
