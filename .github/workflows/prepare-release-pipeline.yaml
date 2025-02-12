@@ -10,7 +10,7 @@ jobs:
     steps:
     - name: Generate git app token
       id: generate-token
-      uses: getsentry/action-github-app-token@v3.1
+      uses: getsentry/action-github-app-token@v3.0.0
       with:
         app_id: ${{ secrets.MULE_CI_APP_ID }}
         private_key: ${{ secrets.MULE_CI_APP_PRIVATE_KEY }}
